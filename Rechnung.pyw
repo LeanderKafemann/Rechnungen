@@ -142,12 +142,24 @@ def export():
     text += "\nDavon Abgaben an LK-Software (0.05%): "+abg
     text += "\nBemerkung: "+py.prompt("Bemerkung hinzufügen: ", "Bemerkung", "-")+"\ngezeichnet: "+c.name+" (umsatzsteuerbefreit)\n"
     xVar = max(34+len(c.name), 41+len(format_money(verbl)), 38+len(abg))
+    copyright_line = "Made with LK Rechnungen - Copyright Leander Kafemann 2024-2025 - Version 1.8.5"
     text = xVar*"-"+text
     text += xVar * "-"
+    protocol_text = ""
+    if getattr(c, "protocol_enabled", False) and c.protocol:
+        protocol_text += "\n\n" + xVar*"=" + "\nPROTOKOLL\n"
+        for entry in c.protocol:
+            protocol_text += entry + "\n"
+        protocol_text += xVar*"=" + "\n"
+        protocol_text += "\n" + copyright_line + "\n"
     filename = "./rechnung-"+tag+"-"+c.name+"-"+c.kunde
+    if not c.protocol_enabled:
+        py.alert("Hinweis: Das Protokoll ist für diese Rechnung deaktiviert.", "Protokoll-Hinweis")
     if py.confirm("Speichern als TXT oder PDF?", "Format", buttons=("TXT", "PDF")) == "TXT":
         with open(filename+".txt", "w", encoding="utf-8") as f:
             f.write(text)
+            if protocol_text:
+                f.write(protocol_text)
     else:
         c_ = CanvasPdf(filename+".pdf")
         c_.setFont("Courier-Bold", 30)
@@ -162,7 +174,22 @@ def export():
         c_.setFont("Courier-Bold", 22)
         c_.drawString(5.5*cm, 7*cm, "Gesamtsumme: "+format_money(gesamt))
         c_.setFont("Courier", 5)
-        c_.drawString(7*cm, 2*cm, "Made with LK Rechnungen - Copyright Leander Kafemann 2024-2025 - Version 1.8.5")
+        c_.drawString(7*cm, 2*cm, copyright_line)
+        if protocol_text:
+            c_.showPage()
+            c_.setFont("Courier-Bold", 22)
+            c_.drawString(2*cm, 27*cm, "Protokoll")
+            c_.setFont("Courier", 13)
+            y = 25*cm
+            for entry in c.protocol:
+                if y < 2*cm:
+                    c_.showPage()
+                    y = 27*cm
+                c_.drawString(2*cm, y, entry)
+                y -= 0.7*cm
+            y -= 1*cm
+            c_.setFont("Courier", 10)
+            c_.drawString(2*cm, y, copyright_line)
         c_.save()
     print(text)
     py.alert("Rechnung erfolgreich exportiert.:\n"+text, "Export")
@@ -340,6 +367,13 @@ def presave(loadDef: bool = False):
                 for i in c.time+[c.kunde, c.name, c.lohn, c.paused, c.share, c.id, c.upload_time, c.speedup]:
                     f.write(str(i)+"#**#")
                 f.write(str(c.ping))
+                if getattr(c, "protocol_enabled", False):
+                    f.write("#**#PROTOCOL#**#")
+                    f.write(str(c.protocol_enabled)+"#**#")
+                    f.write(c.protocol_last_purpose+"#**#")
+                    f.write("|".join(c.protocol))
+                f.write("#**#TOOLTIP#**#")
+                f.write(str(ToolTip.active))
             py.alert("Aktuellen Stand gespeichert.\nRechnungen beenden...", "Gespeichert")
             c.status = "zwischengespeichert"
             upload_data()
@@ -349,7 +383,24 @@ def presave(loadDef: bool = False):
             file = askopenfilename(title="Speicherstand wählen", filetypes=[("LK Rechnungen Speicherstand Dateien", "*.lkrs")])
             with open(file, "r", encoding="utf-8") as f:
                 content = f.read()
-            content_ = content.split("#**#")
+            tooltip_state = True
+            if "#**#TOOLTIP#**#" in content:
+                main, tooltip_part = content.split("#**#TOOLTIP#**#", 1)
+                tooltip_state = tooltip_part.strip().startswith("True")
+            else:
+                main = content
+            if "#**#PROTOCOL#**#" in main:
+                main, proto = main.split("#**#PROTOCOL#**#", 1)
+                content_ = main.split("#**#")
+                proto_ = proto.split("#**#")
+                c.protocol_enabled = proto_[0] == "True"
+                c.protocol_last_purpose = proto_[1]
+                c.protocol = proto_[2].split("|") if proto_[2] else []
+            else:
+                content_ = main.split("#**#")
+                c.protocol_enabled = False
+                c.protocol_last_purpose = ""
+                c.protocol = []
             a = []
             type_ = ["int"]*4+["str"]*2+["float"]+["x_extra"]*2+["str", "int", "float", "x_extra"]
             for i in range(len(content_)):
@@ -361,6 +412,7 @@ def presave(loadDef: bool = False):
             c.id = a[9]; c.upload_time = a[10]; c.speedup = a[11]; c.ping = a[12]
             c.basic_link = "https://lkunited.pythonanywhere.com/Rechnungen/"
             c.link = c.basic_link + "view?id=" + c.id
+            ToolTip.set_active(tooltip_state)
             if c.share != share_def:
                 if c.share:
                     share()
@@ -369,6 +421,7 @@ def presave(loadDef: bool = False):
             c.itemconfig(c.stundenlohn_text, text="à "+format_money(c.lohn)+" pro Stunde entspricht das:")
             window.update()
             py.alert("Speicherstand erfolgreich geladen!", "Laden erfolgreich")
+            update_protocol_window()
         case _:
             pass
 
@@ -385,11 +438,16 @@ def format_money(money):
 def create_button(share_: bool = True):
     if share_:
         c.open_link_b = Button(master=window, command=open_link, text="🌐", background="light blue", relief="ridge")
+        ToolTip(c.open_link_b, "Link im Browser öffnen")
         c.copy_link_b = Button(master=window, command=copy_link, text="📋", background="light blue", relief="ridge")
+        ToolTip(c.copy_link_b, "Link in Zwischenablage kopieren")
         c.speedup_b = Button(master=window, command=speedup, text="⏱️", background="light blue", relief="ridge")
+        ToolTip(c.speedup_b, "Upload-Intervall beschleunigen")
         c.unshare_b = Button(master=window, command=unshare_agent, text="Teilen beenden", background="light blue", relief="ridge", activebackground="blue")
+        ToolTip(c.unshare_b, "Teilen beenden")
     else:
         c.share_b = Button(master=window, command=share, text="Teilen", background="light blue", activebackground="cyan", relief="ridge", height=2, width=24)
+        ToolTip(c.share_b, "Rechnung teilen")
 
 def display_button(share_: bool = True):
     if share_:
@@ -517,7 +575,7 @@ c.create_window(160, 280, window=c.presaveB)
 update_pingB = Button(master=window, command=update_ping_manual, text="⟳", background="light blue", activebackground="light blue",relief="flat", width=1, height=1, font=("Helvetica", 8))
 ToolTip(update_pingB, "Ping manuell aktualisieren")
 c.create_window(105, 413, width=13, height=13, window=update_pingB)
-c.adminPing = Button(master=window, command=disable_ping_, text="🗲", background="light blue", activebackground="light blue", relief="flat", width=1, font=("Helvetica", 8))
+c.adminPing = Button(master=window, command=disable_ping_, text="🗲", background="light blue", activebackground="light blue", relief="flat", width=1, height=1, font=("Helvetica", 8))
 ToolTip(c.adminPing, "Server-Ping aktivieren/deaktivieren")
 c.create_window(120, 413, width=13, height=13, window=c.adminPing)
 c.whatsNew = Button(master=window, command=show_new_, text="ⓘ", background="light blue", activebackground="light blue", relief="flat", width=1, height=1, font=("Helvetica", 8))
@@ -532,22 +590,8 @@ def toggle_tooltips():
     else:
         tooltip_btn.config(relief="raised")
 tooltip_btn = Button(window, text="💡", width=1, height=1, relief="flat", bg="light blue", command=toggle_tooltips, font=("Helvetica", 8))
-tooltip_btn.place(x=293, y=413, width=13, height=19)
+tooltip_btn.place(x=293, y=413, width=13, height=13)
 ToolTip(tooltip_btn, "Tooltips für Hilfetexte aktivieren/deaktivieren", always_show=True)
-
-def create_button(share_: bool = True):
-    if share_:
-        c.open_link_b = Button(master=window, command=open_link, text="🌐", background="light blue", relief="ridge")
-        ToolTip(c.open_link_b, "Link im Browser öffnen")
-        c.copy_link_b = Button(master=window, command=copy_link, text="📋", background="light blue", relief="ridge")
-        ToolTip(c.copy_link_b, "Link in Zwischenablage kopieren")
-        c.speedup_b = Button(master=window, command=speedup, text="⏱️", background="light blue", relief="ridge")
-        ToolTip(c.speedup_b, "Upload-Intervall beschleunigen")
-        c.unshare_b = Button(master=window, command=unshare_agent, text="Teilen beenden", background="light blue", relief="ridge", activebackground="blue")
-        ToolTip(c.unshare_b, "Teilen beenden")
-    else:
-        c.share_b = Button(master=window, command=share, text="Teilen", background="light blue", activebackground="cyan", relief="ridge", height=2, width=24)
-        ToolTip(c.share_b, "Rechnung teilen")
 
 c.new = [c.downloadB]
 
