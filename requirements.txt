@@ -1,0 +1,6 @@
+requests
+pyperclip
+ping3
+pyautogui
+naturalsize
+reportlab
