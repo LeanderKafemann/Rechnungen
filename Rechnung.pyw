@@ -53,7 +53,7 @@ def export():
         c_.setFont("Courier-Bold", 22)
         c_.drawString(5.5*cm, 7*cm, "Gesamtsumme: "+format_money(gesamt))
         c_.setFont("Courier", 5)
-        c_.drawString(7*cm, 2*cm, "Made with LK Rechnungen - Copyright LK 2024-2025 - Version 1.8.4")
+        c_.drawString(7*cm, 2*cm, "Made with LK Rechnungen - Copyright Leander Kafemann 2024-2025 - Version 1.8.5")
         c_.save()
     print(text)
     py.alert("Rechnung erfolgreich exportiert.:\n"+text, "Export")
@@ -235,6 +235,7 @@ def presave(loadDef: bool = False):
                     share()
                 else:
                     unshare()
+            c.itemconfig(c.stundenlohn_text, text="à "+format_money(c.lohn)+" pro Stunde entspricht das:")
             window.update()
             py.alert("Speicherstand erfolgreich geladen!", "Laden erfolgreich")
         case _:
@@ -345,12 +346,14 @@ c.uploaded_text = c.create_text(200, 360, fill="black", font=("Helvetica, 6"))
 c.server_text = c.create_text(68, 414, fill="black", font=("Helvetica", "6", "bold"))
 c.name_text = c.create_text(200, 240, fill="black", text="an "+c.name, font=("Helvetica", "10"))
 
-c.create_text(200, 150, fill="black", text="à "+format_money(c.lohn)+" pro Stunde entspricht das:", font=("Helvetica", "10"))
+c.stundenlohn_text = c.create_text(200, 150, fill="black", text="à "+format_money(c.lohn)+" pro Stunde entspricht das:", font=("Helvetica", "10"))
+
+c.create_text(200, 25, fill="black", text="LK Rechnungen", font=("Verdana", "20", "bold"))
 c.create_text(200, 60, fill="black", text="Arbeitszeit bisher:", font=("Helvetica", "10"))
-c.create_text(200, 415, fill="black", text="Rechnungen Copyright LK 2024-2025", font=("Helvetica", "5"))
+c.create_text(200, 415, fill="black", text="Copyright Leander Kafemann 2024-2025", font=("Helvetica", "5"))
 c.create_text(340, 415, fill="black", text="App-Version:", font=("Helvetica", "5"))
 c.create_text(53, 415, fill="black", text="Server-Ping:"+15*" "+"ms", font=("Helvetica", "5"))
-c.create_text(380, 414, fill="black", text="1.8.4", font=("Helvetica", "6", "bold"))
+c.create_text(380, 414, fill="black", text="1.8.5", font=("Helvetica", "6", "bold"))
 
 c.play_pause = Button(master=window, command=pause_play, text="⏯️", background="light blue", activebackground="light green", relief="ridge")
 
