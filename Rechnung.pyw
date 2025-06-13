@@ -6,6 +6,115 @@ from naturalsize import reverse
 from reportlab.pdfgen.canvas import Canvas as CanvasPdf
 from reportlab.lib.units import cm
 
+# --- Tooltip Hilfsklasse ---
+class ToolTip:
+    active = True
+    all_tooltips = []
+    def __init__(self, widget, text, always_show=False):
+        self.widget = widget
+        self.text = text
+        self.tipwindow = None
+        self.id = None
+        self.visible = False
+        self.always_show = always_show
+        self.widget.bind("<Enter>", self.enter)
+        self.widget.bind("<Leave>", self.leave)
+        ToolTip.all_tooltips.append(self)
+    def enter(self, event=None):
+        if ToolTip.active or self.always_show:
+            self.schedule()
+    def leave(self, event=None):
+        self.unschedule()
+        self.hidetip()
+    def schedule(self):
+        self.unschedule()
+        self.id = self.widget.after(350, self.showtip)
+    def unschedule(self):
+        id_ = self.id
+        self.id = None
+        if id_:
+            self.widget.after_cancel(id_)
+    def showtip(self, event=None):
+        if self.tipwindow or not self.text or (not ToolTip.active and not self.always_show):
+            return
+        x, y = self.widget.winfo_pointerxy()
+        self.tipwindow = tw = Toplevel(self.widget)
+        tw.wm_overrideredirect(1)
+        tw.wm_geometry("+%d+%d" % (x+10, y+10))
+        label = Label(tw, text=self.text, justify=LEFT,
+                      background="#ffffe0", relief=SOLID, borderwidth=1,
+                      font=("tahoma", "8", "normal"))
+        label.pack(ipadx=1)
+        self.visible = True
+    def hidetip(self):
+        tw = self.tipwindow
+        self.tipwindow = None
+        if tw:
+            tw.destroy()
+        self.visible = False
+    @staticmethod
+    def set_active(state: bool):
+        ToolTip.active = state
+        for t in ToolTip.all_tooltips:
+            if not t.always_show:
+                t.hidetip()
+
+# --- Protokoll-Initialisierung und -Funktionen ---
+def init_protocol():
+    c.protocol_enabled = False
+    c.protocol = []
+    c.protocol_last_purpose = ""
+    c.protocol_logged_start = False
+
+def ask_protocol_activation():
+    if c.time != [0, 0, 0, 0]:
+        c.protocol_enabled = False
+        return
+    if py.confirm("Protokoll aktivieren? (Start-/Stopp-Zeiten & Zweck werden gespeichert)", "Protokoll", buttons=("Ja", "Nein")) == "Ja":
+        c.protocol_enabled = True
+        c.protocol_last_purpose = py.prompt("Was ist der Zweck der ersten Sitzung?", "Protokoll-Zweck", "")
+        c.protocol = []
+    else:
+        c.protocol_enabled = False
+        c.protocol_last_purpose = ""
+        c.protocol = []
+
+def log_protocol(event, purpose):
+    if getattr(c, "protocol_enabled", False):
+        now = datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+        c.protocol.append(f"{event}: {now} | Zweck: {purpose}")
+        update_protocol_window()
+
+protocol_window = None
+def open_protocol_window():
+    global protocol_window
+    if protocol_window and protocol_window.winfo_exists():
+        protocol_window.lift()
+        return
+    protocol_window = Toplevel(window)
+    protocol_window.title("Protokoll")
+    protocol_window.geometry("400x200")
+    protocol_window.resizable(False, False)
+    protocol_window.configure(bg="light blue")
+    Label(protocol_window, text="Protokoll (letzte 10 Einträge):", font=("Helvetica", 9, "bold"), bg="light blue").pack(anchor="w", padx=10, pady=(10,0))
+    txt = Text(protocol_window, width=54, height=8, font=("Courier", 8), state="normal", bg="white", relief="solid", bd=1)
+    txt.pack(padx=10, pady=5)
+    txt.insert(END, "\n".join(c.protocol[-10:]) if c.protocol else "(Noch keine Einträge)")
+    txt.config(state="disabled")
+    ToolTip(txt, "Hier sehen Sie die letzten 10 Protokolleinträge (Start/Stop und Zweck).")
+    protocol_window.protocol("WM_DELETE_WINDOW", protocol_window.destroy)
+def update_protocol_window():
+    global protocol_window
+    if protocol_window and protocol_window.winfo_exists():
+        for widget in protocol_window.winfo_children():
+            if isinstance(widget, Text):
+                widget.config(state="normal")
+                widget.delete(1.0, END)
+                widget.insert(END, "\n".join(c.protocol[-10:]) if c.protocol else "(Noch keine Einträge)")
+                widget.config(state="disabled")
+
+# --- Deine Originalfunktionen, aktualisiert ---
+
 def export():
     c.paused = True
     requests.post(c.basic_link+"uploader", {"pw": "lkunited", "message": "-"+c.id})
@@ -90,9 +199,31 @@ def update_lohn():
     c.after(200, update_lohn)
 
 def pause_play():
+    # Protokoll-Integration
+    if not hasattr(c, "protocol_enabled"):
+        c.protocol_enabled = False
+    if not hasattr(c, "protocol"):
+        c.protocol = []
+    if not hasattr(c, "protocol_last_purpose"):
+        c.protocol_last_purpose = ""
+    if not hasattr(c, "protocol_logged_start"):
+        c.protocol_logged_start = False
+
     c.paused = reverse(c.paused)
     c.status = "pausiert" if c.paused else "laufend"
     c.play_pause.config(activebackground="light green" if c.paused else "orange")
+    if c.protocol_enabled:
+        if not c.paused and not c.protocol_logged_start:
+            purpose = py.prompt("Was machen Sie jetzt?", "Zweck der Sitzung", c.protocol_last_purpose)
+            if purpose is None:
+                purpose = c.protocol_last_purpose
+            c.protocol_last_purpose = purpose
+            log_protocol("Gestartet", purpose)
+            c.protocol_logged_start = True
+        elif c.paused and c.protocol_logged_start:
+            log_protocol("Gestoppt", c.protocol_last_purpose)
+            c.protocol_logged_start = False
+    update_protocol_window()
 
 def stop():
     if py.confirm("Wirklich ungespeichert beenden?", "Stop", buttons=("JA", "NEIN")) == "JA":
@@ -269,6 +400,7 @@ def display_button(share_: bool = True):
     else:
         c.create_window(200, 345, window=c.share_b)
 
+# --- Fenster, Canvas, statische UI-Elemente ---
 window = Tk()
 window.title("Rechnungen")
 window.iconbitmap("./programdata/rechnungen/rechnung.ico")
@@ -276,6 +408,27 @@ c = Canvas(window, width=400, height=420)
 c.configure(bg="light blue")
 c.pack()
 
+# Canvas-Elemente
+c.time_text = c.create_text(200, 100, fill="black", font=("Helvetica", "30", "bold"))
+c.lohn_text = c.create_text(200, 190, fill="black", font=("Helvetica", "30", "bold"))
+c.link_text = c.create_text(200, 350, fill="black", font=("Helvetica, 6"))
+c.id_text = c.create_text(200, 335, fill="black", font=("Helvetica", "10", "bold"))
+c.descr_text = c.create_text(200, 315, fill="black", font=("Helvetica", "7"))
+c.uptime_text2 = c.create_text(299, 318, fill="black", font=("Helvetica", "6"))
+c.uptime_text = c.create_text(300, 332, fill="black", font=("Helvetica", "8"))
+c.upload_time_text = c.create_text(307, 332, fill="black", font=("Helvetica", "9", "bold"))
+c.uploaded_text = c.create_text(200, 360, fill="black", font=("Helvetica, 6"))
+c.server_text = c.create_text(68, 414, fill="black", font=("Helvetica", "6", "bold"))
+c.name_text = c.create_text(200, 240, fill="black", text="", font=("Helvetica", "10"))
+c.stundenlohn_text = c.create_text(200, 150, fill="black", text="", font=("Helvetica", "10"))
+c.create_text(200, 25, fill="black", text="LK Rechnungen", font=("Verdana", "20", "bold"))
+c.create_text(200, 60, fill="black", text="Arbeitszeit bisher:", font=("Helvetica", "10"))
+c.create_text(200, 415, fill="black", text="Copyright Leander Kafemann 2024-2025", font=("Helvetica", "5"))
+c.create_text(340, 415, fill="black", text="App-Version:", font=("Helvetica", "5"))
+c.create_text(53, 415, fill="black", text="Server-Ping:"+15*" "+"ms", font=("Helvetica", "5"))
+c.create_text(380, 414, fill="black", text="1.8.5", font=("Helvetica", "6", "bold"))
+
+# --- Initialisierung: Kunden, Lohn, Name etc. ---
 try:
     with open("./programdata/rechnungen/kunden.txt", "r", encoding="utf-8") as f:
         c.kunden = f.read().split("#*#")
@@ -333,53 +486,68 @@ c.speedup_v = False
 c.ping = False
 c.show_new = False
 
-c.time_text = c.create_text(200, 100, fill="black", font=("Helvetica", "30", "bold"))
-c.lohn_text = c.create_text(200, 190, fill="black", font=("Helvetica", "30", "bold"))
-c.link_text = c.create_text(200, 350, fill="black", font=("Helvetica, 6"))
-c.id_text = c.create_text(200, 335, fill="black", font=("Helvetica", "10", "bold"))
-c.descr_text = c.create_text(200, 315, fill="black", font=("Helvetica", "7"))
-c.uptime_text2 = c.create_text(299, 318, fill="black", font=("Helvetica", "6"))
-c.uptime_text = c.create_text(300, 332, fill="black", font=("Helvetica", "8"))
-c.upload_time_text = c.create_text(307, 332, fill="black", font=("Helvetica", "9", "bold"))
-c.uploaded_text = c.create_text(200, 360, fill="black", font=("Helvetica, 6"))
-c.server_text = c.create_text(68, 414, fill="black", font=("Helvetica", "6", "bold"))
-c.name_text = c.create_text(200, 240, fill="black", text="an "+c.name, font=("Helvetica", "10"))
-c.stundenlohn_text = c.create_text(200, 150, fill="black", text="à "+format_money(c.lohn)+" pro Stunde entspricht das:", font=("Helvetica", "10"))
-c.create_text(200, 25, fill="black", text="LK Rechnungen", font=("Verdana", "20", "bold"))
-c.create_text(200, 60, fill="black", text="Arbeitszeit bisher:", font=("Helvetica", "10"))
-c.create_text(200, 415, fill="black", text="Copyright Leander Kafemann 2024-2025", font=("Helvetica", "5"))
-c.create_text(340, 415, fill="black", text="App-Version:", font=("Helvetica", "5"))
-c.create_text(53, 415, fill="black", text="Server-Ping:"+15*" "+"ms", font=("Helvetica", "5"))
-c.create_text(380, 414, fill="black", text="1.8.5", font=("Helvetica", "6", "bold"))
+c.itemconfig(c.name_text, text="an "+c.name)
+c.itemconfig(c.stundenlohn_text, text="à "+format_money(c.lohn)+" pro Stunde entspricht das:")
 
+# Protokoll initialisieren
+init_protocol()
+if not c.skipintro:
+    ask_protocol_activation()
+
+# --- Buttons und dynamische Buttons ---
 c.play_pause = Button(master=window, command=pause_play, text="⏯️", background="light blue", activebackground="light green", relief="ridge")
+ToolTip(c.play_pause, "Timer starten/pausieren")
 create_button(False)
 c.create_window(200, 280, window=c.play_pause)
 display_button(False)
 
 c.downloadB = Button(master=window, command=export_agent, text="🡇", background="light blue", activebackground="blue", relief="ridge")
+ToolTip(c.downloadB, "Rechnung exportieren")
 c.create_window(120, 280, window=c.downloadB, width=33)
-c.create_window(280, 280, window=Button(master=window, command=stop, text="⏹", background="light blue", activebackground="red", relief="ridge"))
+stopB = Button(master=window, command=stop, text="⏹", background="light blue", activebackground="red", relief="ridge")
+ToolTip(stopB, "Rechnung ohne Speichern beenden")
+c.create_window(280, 280, window=stopB)
 c.addTimeB = Button(master=window, command=add, text="➕", background="light blue", activebackground="green", relief="ridge")
+ToolTip(c.addTimeB, "Zeit manuell hinzufügen")
 c.create_window(240, 280, window=c.addTimeB)
 c.presaveB = Button(master=window, command=presave, text="💾", background="light blue", activebackground="green", relief="ridge")
+ToolTip(c.presaveB, "Speichern/Laden")
 c.create_window(160, 280, window=c.presaveB)
 
-c.create_window(105, 413, width=13, height=13, window=Button(master=window, command=update_ping_manual, text="⟳", background="light blue", activebackground="light blue",relief="flat", width=1, height=1))
-c.adminPing = Button(master=window, command=disable_ping_, text="🗲", background="light blue", activebackground="light blue", relief="flat", width=1)
+update_pingB = Button(master=window, command=update_ping_manual, text="⟳", background="light blue", activebackground="light blue",relief="flat", width=1, height=1, font=("Helvetica", 8))
+ToolTip(update_pingB, "Ping manuell aktualisieren")
+c.create_window(105, 413, width=13, height=13, window=update_pingB)
+c.adminPing = Button(master=window, command=disable_ping_, text="🗲", background="light blue", activebackground="light blue", relief="flat", width=1, font=("Helvetica", 8))
+ToolTip(c.adminPing, "Server-Ping aktivieren/deaktivieren")
 c.create_window(120, 413, width=13, height=13, window=c.adminPing)
 c.whatsNew = Button(master=window, command=show_new_, text="ⓘ", background="light blue", activebackground="light blue", relief="flat", width=1, height=1, font=("Helvetica", 8))
+ToolTip(c.whatsNew, "Was ist neu?")
 c.create_window(306, 413, width=13, height=19, window=c.whatsNew)
 
 # Tooltip-Button (💡) wie Info-Button, klein, links daneben
 def toggle_tooltips():
-    ToolTip.active = not getattr(ToolTip, "active", True)
+    ToolTip.set_active(not ToolTip.active)
     if ToolTip.active:
         tooltip_btn.config(relief="sunken")
     else:
         tooltip_btn.config(relief="raised")
 tooltip_btn = Button(window, text="💡", width=1, height=1, relief="flat", bg="light blue", command=toggle_tooltips, font=("Helvetica", 8))
 tooltip_btn.place(x=293, y=413, width=13, height=19)
+ToolTip(tooltip_btn, "Tooltips für Hilfetexte aktivieren/deaktivieren", always_show=True)
+
+def create_button(share_: bool = True):
+    if share_:
+        c.open_link_b = Button(master=window, command=open_link, text="🌐", background="light blue", relief="ridge")
+        ToolTip(c.open_link_b, "Link im Browser öffnen")
+        c.copy_link_b = Button(master=window, command=copy_link, text="📋", background="light blue", relief="ridge")
+        ToolTip(c.copy_link_b, "Link in Zwischenablage kopieren")
+        c.speedup_b = Button(master=window, command=speedup, text="⏱️", background="light blue", relief="ridge")
+        ToolTip(c.speedup_b, "Upload-Intervall beschleunigen")
+        c.unshare_b = Button(master=window, command=unshare_agent, text="Teilen beenden", background="light blue", relief="ridge", activebackground="blue")
+        ToolTip(c.unshare_b, "Teilen beenden")
+    else:
+        c.share_b = Button(master=window, command=share, text="Teilen", background="light blue", activebackground="cyan", relief="ridge", height=2, width=24)
+        ToolTip(c.share_b, "Rechnung teilen")
 
 c.new = [c.downloadB]
 
