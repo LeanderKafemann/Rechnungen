@@ -58,10 +58,10 @@ def export():
     print(text)
     py.alert("Rechnung erfolgreich exportiert.:\n"+text, "Export")
     quit()
-    
+
 def export_agent():
     c.after(1, export)
-    
+
 def update_time():
     if not c.paused:
         if c.time[3] < 8:
@@ -79,7 +79,7 @@ def update_time():
                     c.time[0] += 1
     c.itemconfig(c.time_text, text=format_time(c.time))
     c.after(195, update_time)
-    
+
 def update_lohn():
     zeit = format_time(c.time)
     zl = zeit.split(" : ")
@@ -88,17 +88,17 @@ def update_lohn():
     c.itemconfig(c.lohn_text, text=c.lohn_akt)
     c.itemconfig(c.name_text, text="an "+c.name)
     c.after(200, update_lohn)
-    
+
 def pause_play():
     c.paused = reverse(c.paused)
     c.status = "pausiert" if c.paused else "laufend"
     c.play_pause.config(activebackground="light green" if c.paused else "orange")
-    
+
 def stop():
     if py.confirm("Wirklich ungespeichert beenden?", "Stop", buttons=("JA", "NEIN")) == "JA":
         requests.post(c.basic_link+"uploader", {"pw": "lkunited", "message": "-"+c.id})
         quit()
-        
+
 def share():
     c.share = True
     c.share_b.destroy()
@@ -110,7 +110,7 @@ def share():
     c.itemconfig(c.upload_time_text, text=str(c.upload_time))
     create_button()
     display_button()
-    
+
 def unshare():
     c.share = False
     requests.post(c.basic_link+"uploader", {"pw": "lkunited", "message": "-"+c.id})
@@ -120,16 +120,16 @@ def unshare():
         i.destroy()
     create_button(False)
     display_button(False)
-        
+
 def unshare_agent():
     c.after(1, unshare)
-    
+
 def copy_link():
     pyperclip.copy(c.link)
-   
+
 def open_link():
     webbrowser.open(c.link)
-    
+
 def speedup():
     if c.upload_time < 60:
         c.speedup *= 1.5; c.speedup_v = True
@@ -140,14 +140,14 @@ def speedup():
     else:
         c.upload_time = 3
     c.itemconfig(c.upload_time_text, text=str(c.upload_time))
-    
+
 def reset_speedup():
     if not c.speedup_v:
         c.speedup = 1.0
     else:
         c.speedup_v = False
         c.after(500, reset_speedup)
-    
+
 def upload_data():
     if c.share:
         c.itemconfig(c.uploaded_text, text="hochladen...")
@@ -157,10 +157,10 @@ def upload_data():
         c.after(1000*c.upload_time, upload_data)
     else:
         c.after(1000, upload_data)
-        
+
 def rm_upload_text():
     c.itemconfig(c.uploaded_text, text="")
-    
+
 def update_ping(recall = True):
     if c.ping:
         c.server_ping = str(round(round(ping3.ping("lkunited.pythonanywhere.com"), ndigits=3)*1000))
@@ -169,14 +169,14 @@ def update_ping(recall = True):
         c.itemconfig(c.server_text, text="OFF")
     if recall:
         c.after(90000, update_ping)
-        
+
 def update_ping_manual():
     update_ping(False)
-    
+
 def disable_ping_():
     c.ping = False if c.ping else True
     update_ping_manual()
-    
+
 def show_new_():
     for i in c.new:
         i.config(background="yellow" if not c.show_new else "light blue")
@@ -240,8 +240,7 @@ def presave(loadDef: bool = False):
             py.alert("Speicherstand erfolgreich geladen!", "Laden erfolgreich")
         case _:
             pass
-    
-#Utils
+
 def format_time(time_: list = [0, 0, 0, 0]):
     time2 = time_.copy()
     for i in range(3):
@@ -249,18 +248,18 @@ def format_time(time_: list = [0, 0, 0, 0]):
             time2[i] = "0"+str(time2[i])
     return str(time2).rstrip("]").lstrip("[").replace(", ", " : ").replace("'", "")
 
-def format_money(money):    
+def format_money(money):
     return str(money)+"0 €" if len(str(money).split(".")[-1]) < 2 else str(money)+" €"
 
 def create_button(share_: bool = True):
     if share_:
-        c.open_link_b = Button(master=window, command=open_link, text="🌐", background="light blue", relief="flat")
-        c.copy_link_b = Button(master=window, command=copy_link, text="📋", background="light blue", relief="flat")
-        c.speedup_b = Button(master=window, command=speedup, text="⏱️", background="light blue", relief="flat")
-        c.unshare_b = Button(master=window, command=unshare_agent, text="Teilen beenden", background="light blue", relief="solid", activebackground="blue")
+        c.open_link_b = Button(master=window, command=open_link, text="🌐", background="light blue", relief="ridge")
+        c.copy_link_b = Button(master=window, command=copy_link, text="📋", background="light blue", relief="ridge")
+        c.speedup_b = Button(master=window, command=speedup, text="⏱️", background="light blue", relief="ridge")
+        c.unshare_b = Button(master=window, command=unshare_agent, text="Teilen beenden", background="light blue", relief="ridge", activebackground="blue")
     else:
-        c.share_b = Button(master=window, command=share, text="Teilen", background="light blue", activebackground="cyan", relief="solid", height=2, width=24)
-        
+        c.share_b = Button(master=window, command=share, text="Teilen", background="light blue", activebackground="cyan", relief="ridge", height=2, width=24)
+
 def display_button(share_: bool = True):
     if share_:
         c.create_window(100, 325, window=c.copy_link_b)
@@ -269,7 +268,7 @@ def display_button(share_: bool = True):
         c.create_window(200, 385, window=c.unshare_b)
     else:
         c.create_window(200, 345, window=c.share_b)
-    
+
 window = Tk()
 window.title("Rechnungen")
 window.iconbitmap("./programdata/rechnungen/rechnung.ico")
@@ -345,9 +344,7 @@ c.upload_time_text = c.create_text(307, 332, fill="black", font=("Helvetica", "9
 c.uploaded_text = c.create_text(200, 360, fill="black", font=("Helvetica, 6"))
 c.server_text = c.create_text(68, 414, fill="black", font=("Helvetica", "6", "bold"))
 c.name_text = c.create_text(200, 240, fill="black", text="an "+c.name, font=("Helvetica", "10"))
-
 c.stundenlohn_text = c.create_text(200, 150, fill="black", text="à "+format_money(c.lohn)+" pro Stunde entspricht das:", font=("Helvetica", "10"))
-
 c.create_text(200, 25, fill="black", text="LK Rechnungen", font=("Verdana", "20", "bold"))
 c.create_text(200, 60, fill="black", text="Arbeitszeit bisher:", font=("Helvetica", "10"))
 c.create_text(200, 415, fill="black", text="Copyright Leander Kafemann 2024-2025", font=("Helvetica", "5"))
@@ -356,9 +353,7 @@ c.create_text(53, 415, fill="black", text="Server-Ping:"+15*" "+"ms", font=("Hel
 c.create_text(380, 414, fill="black", text="1.8.5", font=("Helvetica", "6", "bold"))
 
 c.play_pause = Button(master=window, command=pause_play, text="⏯️", background="light blue", activebackground="light green", relief="ridge")
-
 create_button(False)
-
 c.create_window(200, 280, window=c.play_pause)
 display_button(False)
 
@@ -372,9 +367,19 @@ c.create_window(160, 280, window=c.presaveB)
 
 c.create_window(105, 413, width=13, height=13, window=Button(master=window, command=update_ping_manual, text="⟳", background="light blue", activebackground="light blue",relief="flat", width=1, height=1))
 c.adminPing = Button(master=window, command=disable_ping_, text="🗲", background="light blue", activebackground="light blue", relief="flat", width=1)
-c.create_window(120, 413, width=13, height=13, window=c.adminPing) #whats new
-c.whatsNew = Button(master=window, command=show_new_, text="ⓘ", background="light blue", activebackground="light blue", relief="flat")
+c.create_window(120, 413, width=13, height=13, window=c.adminPing)
+c.whatsNew = Button(master=window, command=show_new_, text="ⓘ", background="light blue", activebackground="light blue", relief="flat", width=1, height=1, font=("Helvetica", 8))
 c.create_window(306, 413, width=13, height=19, window=c.whatsNew)
+
+# Tooltip-Button (💡) wie Info-Button, klein, links daneben
+def toggle_tooltips():
+    ToolTip.active = not getattr(ToolTip, "active", True)
+    if ToolTip.active:
+        tooltip_btn.config(relief="sunken")
+    else:
+        tooltip_btn.config(relief="raised")
+tooltip_btn = Button(window, text="💡", width=1, height=1, relief="flat", bg="light blue", command=toggle_tooltips, font=("Helvetica", 8))
+tooltip_btn.place(x=293, y=413, width=13, height=19)
 
 c.new = [c.downloadB]
 
