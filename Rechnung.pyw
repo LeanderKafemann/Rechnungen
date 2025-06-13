@@ -435,6 +435,24 @@ def format_time(time_: list = [0, 0, 0, 0]):
 def format_money(money):
     return str(money)+"0 €" if len(str(money).split(".")[-1]) < 2 else str(money)+" €"
 
+def open_protocol_window():
+    global protocol_window
+    if 'protocol_window' in globals() and protocol_window and protocol_window.winfo_exists():
+        protocol_window.lift()
+        return
+    protocol_window = Toplevel(window)
+    protocol_window.title("Protokoll")
+    protocol_window.geometry("400x220")
+    protocol_window.resizable(False, False)
+    protocol_window.configure(bg="light blue")
+    Label(protocol_window, text="Protokoll (letzte 10 Einträge):", font=("Helvetica", 9, "bold"), bg="light blue").pack(anchor="w", padx=10, pady=(10,0))
+    txt = Text(protocol_window, width=54, height=8, font=("Courier", 8), state="normal", bg="white", relief="solid", bd=1)
+    txt.pack(padx=10, pady=5)
+    txt.insert(END, "\n".join(c.protocol[-10:]) if c.protocol else "(Noch keine Einträge)")
+    txt.config(state="disabled")
+    ToolTip(txt, "Hier sehen Sie die letzten 10 Protokolleinträge (Start/Stop und Zweck).")
+    protocol_window.protocol("WM_DELETE_WINDOW", protocol_window.destroy)
+
 def create_button(share_: bool = True):
     if share_:
         c.open_link_b = Button(master=window, command=open_link, text="🌐", background="light blue", relief="ridge")
@@ -592,6 +610,10 @@ def toggle_tooltips():
 tooltip_btn = Button(window, text="💡", width=1, height=1, relief="flat", bg="light blue", command=toggle_tooltips, font=("Helvetica", 8))
 tooltip_btn.place(x=293, y=413, width=13, height=13)
 ToolTip(tooltip_btn, "Tooltips für Hilfetexte aktivieren/deaktivieren", always_show=True)
+
+protocol_btn = Button(window, text="📋", width=1, height=1, relief="flat", bg="light blue", command=open_protocol_window, font=("Helvetica", 8))
+protocol_btn.place(x=273, y=413, width=13, height=13)
+ToolTip(protocol_btn, "Protokoll anzeigen")
 
 c.new = [c.downloadB]
 
