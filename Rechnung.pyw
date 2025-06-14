@@ -623,7 +623,7 @@ tooltip_btn = Button(window, text="💡", width=2, height=2, relief="flat", bg="
 tooltip_btn.place(x=280, y=404, width=19, height=19)
 ToolTip(tooltip_btn, "Tooltips für Hilfetexte aktivieren/deaktivieren", always_show=True)
 
-c.new = [c.downloadB]
+c.new = [tooltip_btn, protocol_btn, c.play_pause, c.downloadB]
 
 if c.skipintro:
     presave(loadDef = True)
