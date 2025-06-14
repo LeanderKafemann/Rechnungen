@@ -146,7 +146,7 @@ def export():
     text += "\nDavon Abgaben an LK-Software (0.05%): "+abg
     text += "\nBemerkung: "+py.prompt("Bemerkung hinzufügen: ", "Bemerkung", "-")+"\ngezeichnet: "+c.name+" (umsatzsteuerbefreit)\n"
     xVar = max(34+len(c.name), 41+len(format_money(verbl)), 38+len(abg))
-    copyright_line = "Made with LK Rechnungen - Copyright Leander Kafemann 2024-2025 - Version 1.8.5"
+    copyright_line = "Made with LK Rechnungen - Copyright Leander Kafemann 2024-2025 - Version 2.0.0"
     text = xVar*"-"+text
     text += xVar * "-"
     protocol_text = ""
@@ -186,16 +186,16 @@ def export():
             c_.setFont("Courier", 13)
             y = 25*cm
             for entry in c.protocol:
-                entry = entry.replace(" |", "\n")
-                for line in split_text(entry, 90):
-                    if y < 2*cm:
-                        c_.showPage()
-                        y = 27*cm
-                    c_.drawString(2*cm, y, line)
-                    y -= 0.7*cm
+                for subline in entry.splitlines():
+                    for line in split_text(subline, 75):
+                        if y < 2*cm:
+                            c_.showPage()
+                            y = 27*cm
+                        c_.drawString(2*cm, y, line)
+                        y -= 0.7*cm
             y -= 1*cm
             c_.setFont("Courier", 5)
-            c_.drawString(2*cm, y, copyright_line)
+            c_.drawString(7*cm, y, copyright_line)
         c_.save()
     print(text)
     py.alert("Rechnung erfolgreich exportiert.:\n"+text, "Export")
@@ -403,7 +403,7 @@ def presave(loadDef: bool = False):
                 proto_ = proto.split("#**#")
                 c.protocol_enabled = proto_[0] == "True"
                 c.protocol_last_purpose = proto_[1]
-                c.protocol = proto_[2].split("|") if proto_[2] else []
+                c.protocol = [entry.replace(" | Zweck: ", "\nZweck: ") for entry in proto_[2].split("|")] if proto_[2] else []
             else:
                 content_ = main.split("#**#")
                 c.protocol_enabled = False
@@ -489,6 +489,7 @@ def display_button(share_: bool = True):
 # --- Fenster, Canvas, statische UI-Elemente ---
 window = Tk()
 window.title("Rechnungen")
+window.resizable(False, False)
 window.iconbitmap("./programdata/rechnungen/rechnung.ico")
 c = Canvas(window, width=400, height=420)
 c.configure(bg="light blue")
@@ -512,7 +513,7 @@ c.create_text(200, 60, fill="black", text="Arbeitszeit bisher:", font=("Helvetic
 c.create_text(200, 415, fill="black", text="Copyright Leander Kafemann 2024-2025", font=("Helvetica", "5"))
 c.create_text(340, 415, fill="black", text="App-Version:", font=("Helvetica", "5"))
 c.create_text(53, 415, fill="black", text="Server-Ping:"+15*" "+"ms", font=("Helvetica", "5"))
-c.create_text(380, 414, fill="black", text="1.8.5", font=("Helvetica", "6", "bold"))
+c.create_text(380, 414, fill="black", text="2.0.0", font=("Helvetica", "6", "bold"))
 
 # --- Initialisierung: Kunden, Lohn, Name etc. ---
 try:
@@ -603,10 +604,10 @@ c.create_window(160, 280, window=c.presaveB)
 update_pingB = Button(master=window, command=update_ping_manual, text="⟳", background="light blue", activebackground="light blue",relief="flat", width=1, height=1, font=("Helvetica", 8))
 ToolTip(update_pingB, "Ping manuell aktualisieren")
 c.create_window(105, 413, width=13, height=13, window=update_pingB)
-c.adminPing = Button(master=window, command=disable_ping_, text="🗲", background="light blue", activebackground="light blue", relief="flat", width=1, height=1, font=("Helvetica", 8))
+c.adminPing = Button(master=window, command=disable_ping_, text="🗲", background="light blue", activebackground="light blue", relief="flat", width=1, height=1, font=("Helvetica", 9))
 ToolTip(c.adminPing, "Server-Ping aktivieren/deaktivieren")
-c.create_window(117, 410, width=13, height=19, window=c.adminPing)
-c.whatsNew = Button(master=window, command=show_new_, text="ⓘ", background="light blue", activebackground="light blue", relief="flat", width=1, height=1, font=("Helvetica", 8))
+c.create_window(117, 412, width=13, height=19, window=c.adminPing)
+c.whatsNew = Button(master=window, command=show_new_, text="ⓘ", background="light blue", activebackground="light blue", relief="flat", width=1, height=1, font=("Helvetica", 7))
 ToolTip(c.whatsNew, "Was ist neu?")
 c.create_window(306, 413, width=13, height=19, window=c.whatsNew)
 
@@ -618,8 +619,8 @@ ToolTip(protocol_btn, "Protokoll anzeigen")
 # Tooltip-Button (💡) immer relief="flat"
 def toggle_tooltips():
     ToolTip.set_active(not ToolTip.active)
-tooltip_btn = Button(window, text="💡", width=2, height=2, relief="flat", bg="light blue", command=toggle_tooltips, font=("Helvetica", 8))
-tooltip_btn.place(x=283, y=407, width=19, height=19)
+tooltip_btn = Button(window, text="💡", width=2, height=2, relief="flat", bg="light blue", command=toggle_tooltips, font=("Helvetica", 9))
+tooltip_btn.place(x=280, y=404, width=19, height=19)
 ToolTip(tooltip_btn, "Tooltips für Hilfetexte aktivieren/deaktivieren", always_show=True)
 
 c.new = [c.downloadB]
