@@ -82,7 +82,7 @@ def ask_protocol_activation():
 def log_protocol(event, purpose):
     if getattr(c, "protocol_enabled", False):
         now = datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S")
-        c.protocol.append(f"{event}: {now} | Zweck: {purpose}")
+        c.protocol.append(f"{event}: {now}\nZweck: {purpose}")
         update_protocol_window()
 
 protocol_window = None
@@ -113,10 +113,14 @@ def update_protocol_window():
                 widget.insert(END, "\n".join(c.protocol[-10:]) if c.protocol else "(Noch keine Einträge)")
                 widget.config(state="disabled")
 
-# --- Deine Originalfunktionen, aktualisiert ---
+def split_text(text, max_len=75):
+    # Teilt Text in Zeilen mit maximal max_len Zeichen
+    import textwrap
+    return textwrap.wrap(text, max_len)
 
 def export():
-    c.paused = True
+    if not c.paused:
+        pause_play()
     requests.post(c.basic_link+"uploader", {"pw": "lkunited", "message": "-"+c.id})
     text = ""
     today = datetime.datetime.today()
@@ -182,13 +186,15 @@ def export():
             c_.setFont("Courier", 13)
             y = 25*cm
             for entry in c.protocol:
-                if y < 2*cm:
-                    c_.showPage()
-                    y = 27*cm
-                c_.drawString(2*cm, y, entry)
-                y -= 0.7*cm
+                entry = entry.replace(" |", "\n")
+                for line in split_text(entry, 90):
+                    if y < 2*cm:
+                        c_.showPage()
+                        y = 27*cm
+                    c_.drawString(2*cm, y, line)
+                    y -= 0.7*cm
             y -= 1*cm
-            c_.setFont("Courier", 10)
+            c_.setFont("Courier", 5)
             c_.drawString(2*cm, y, copyright_line)
         c_.save()
     print(text)
@@ -361,6 +367,8 @@ def presave(loadDef: bool = False):
         loadsave = "Laden"
     match loadsave:
         case "Speichern":
+            if not c.paused:
+                pause_play()
             file = asksaveasfilename(title="Namen und Verzeichnis wählen", filetypes=[("LK Rechnungen Speicherstand Dateien", "*.lkrs")])
             file += ".lkrs" if not file.endswith(".lkrs") else ""
             with open(file, "w", encoding="utf-8") as f:
@@ -401,6 +409,8 @@ def presave(loadDef: bool = False):
                 c.protocol_enabled = False
                 c.protocol_last_purpose = ""
                 c.protocol = []
+            if c.protocol_enabled:
+                c.protocol_logged_start = False
             a = []
             type_ = ["int"]*4+["str"]*2+["float"]+["x_extra"]*2+["str", "int", "float", "x_extra"]
             for i in range(len(content_)):
@@ -595,25 +605,22 @@ ToolTip(update_pingB, "Ping manuell aktualisieren")
 c.create_window(105, 413, width=13, height=13, window=update_pingB)
 c.adminPing = Button(master=window, command=disable_ping_, text="🗲", background="light blue", activebackground="light blue", relief="flat", width=1, height=1, font=("Helvetica", 8))
 ToolTip(c.adminPing, "Server-Ping aktivieren/deaktivieren")
-c.create_window(120, 413, width=13, height=13, window=c.adminPing)
+c.create_window(117, 410, width=13, height=19, window=c.adminPing)
 c.whatsNew = Button(master=window, command=show_new_, text="ⓘ", background="light blue", activebackground="light blue", relief="flat", width=1, height=1, font=("Helvetica", 8))
 ToolTip(c.whatsNew, "Was ist neu?")
 c.create_window(306, 413, width=13, height=19, window=c.whatsNew)
 
-# Tooltip-Button (💡) wie Info-Button, klein, links daneben
+# Protokoll-Button neben der Überschrift (rechts)
+protocol_btn = Button(window, text="📋", width=2, height=1, relief="flat", bg="light blue", command=open_protocol_window, font=("Helvetica", 12))
+protocol_btn.place(x=350, y=10, width=30, height=30)
+ToolTip(protocol_btn, "Protokoll anzeigen")
+
+# Tooltip-Button (💡) immer relief="flat"
 def toggle_tooltips():
     ToolTip.set_active(not ToolTip.active)
-    if ToolTip.active:
-        tooltip_btn.config(relief="sunken")
-    else:
-        tooltip_btn.config(relief="raised")
-tooltip_btn = Button(window, text="💡", width=1, height=1, relief="flat", bg="light blue", command=toggle_tooltips, font=("Helvetica", 8))
-tooltip_btn.place(x=293, y=413, width=13, height=13)
+tooltip_btn = Button(window, text="💡", width=2, height=2, relief="flat", bg="light blue", command=toggle_tooltips, font=("Helvetica", 8))
+tooltip_btn.place(x=283, y=407, width=19, height=19)
 ToolTip(tooltip_btn, "Tooltips für Hilfetexte aktivieren/deaktivieren", always_show=True)
-
-protocol_btn = Button(window, text="📋", width=1, height=1, relief="flat", bg="light blue", command=open_protocol_window, font=("Helvetica", 8))
-protocol_btn.place(x=273, y=413, width=13, height=13)
-ToolTip(protocol_btn, "Protokoll anzeigen")
 
 c.new = [c.downloadB]
 
