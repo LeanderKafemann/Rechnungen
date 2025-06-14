@@ -338,13 +338,13 @@ def update_ping_manual():
     update_ping(False)
 
 def disable_ping_():
-    c.ping = False if c.ping else True
+    c.ping = reverse(c.ping)
     update_ping_manual()
 
 def show_new_():
     for i in c.new:
         i.config(background="yellow" if not c.show_new else "light blue")
-    c.show_new = False if c.show_new else True
+    c.show_new = reverse(c.show_new)
 
 def add():
     art_ = ["Stunden", "Minuten", "Sekunden", "Zehntelsekunden"]
